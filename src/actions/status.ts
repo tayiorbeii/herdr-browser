@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { health } from "../daemonClient";
+import { daemonStateDiagnostics } from "../paths";
 
 const pluginRoot = process.env.HERDR_PLUGIN_ROOT ?? process.cwd();
 const cliPath = join(pluginRoot, "src", "cli.ts");
@@ -12,6 +13,7 @@ try {
   const daemon = await health();
   console.log(JSON.stringify({
     ok: true,
+    state: daemonStateDiagnostics(),
     plugin_id: process.env.HERDR_PLUGIN_ID ?? null,
     plugin_root: pluginRoot,
     cli: existsSync(cliPath) ? `bun run ${cliPath}` : null,

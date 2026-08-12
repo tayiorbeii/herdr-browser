@@ -22,6 +22,60 @@ Bun from any working directory:
 bun run "<plugin_root>/src/cli.ts"
 ```
 
+## Required visible-view bootstrap
+
+A Herdr pane labeled `Browser` may still be an ordinary shell pane. Running a
+CDP client from that shell controls Chromium but leaves only the command prompt
+visible. Create the plugin-owned viewer pane first:
+
+```bash
+herdr plugin pane open \
+  --plugin official.browser \
+  --entrypoint browser \
+  --workspace "$HERDR_WORKSPACE_ID" \
+  --placement tab \
+  --focus
+```
+
+The command returns the plugin pane ID. Use
+`herdr plugin pane focus <pane_id>` if the rendered viewer is not visible.
+`--placement tab` is the reliable path when starting from an existing Herdr
+tab; do not repurpose a regular terminal pane with the label `Browser`.
+
+Then connect the automation client from any Herdr shell pane. For
+browser-harness, use the installed wrapper when the current project does not
+provide `./scripts/bh-herdr`:
+
+```bash
+BH_HERDR="$HOME/.claude/skills/browser-harness/scripts/bh-herdr"
+"$BH_HERDR" run -c $'reuse_tab("https://example.com")\nwait_for_load()\nprint(page_info())'
+```
+
+Use Bash ANSI-C quoting (`$'...'`) for multi-line Python. Do not put literal
+`\\n` inside ordinary single quotes: Python receives the backslash and raises
+`SyntaxError: unexpected character after line continuation character`.
+
+### Inspect and connect workflows
+
+For a first-class, view-scoped connection (and to open/focus the viewer when
+needed), use:
+
+```bash
+herdr-browser inspect
+herdr-browser inspect --view <view-id>
+```
+
+`inspect` selects the sole live view or opens exactly one plugin-owned viewer
+pane. It prints the gateway HTTP endpoint, browser/page WebSocket URLs, and
+ready-to-copy CDP client snippets. `chrome-devtools-mcp` and Playwright MCP
+are automation clients, not browser windows; attaching them will not render a
+native Chrome tab. A remote CDP target also cannot be imported into another
+Chrome process as an ordinary native tab.
+
+State is session-scoped. If a plugin pane and shell resolve different state
+files, pass the same path explicitly with `HERDR_BROWSER_DAEMON_STATE` (the
+`inspect` command does this for newly opened panes).
+
 List live browser views before connecting:
 
 ```bash

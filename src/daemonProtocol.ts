@@ -18,6 +18,7 @@ export type DaemonState = {
   screencastEveryNthFrame?: 1 | 2;
   profileDir?: string;
   chromePid?: number | null;
+  displayMode?: "headless" | "headful";
 };
 
 export type DaemonHealth = {
@@ -61,6 +62,7 @@ export type DaemonStatus = {
   url: string;
   title: string;
   captureBackend: CaptureBackend;
+  display_mode?: "headless" | "headful";
   tabs: BrowserTabInfo[];
 };
 

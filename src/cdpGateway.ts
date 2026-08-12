@@ -15,6 +15,20 @@ type PendingRequest = {
   params: Record<string, unknown>;
 };
 
+// These methods expose or mutate browser-global state that cannot be proven to
+// belong to one view. Keep the gateway useful for normal CDP automation while
+// refusing cross-view metadata and window control.
+const UNSCOPED_BROWSER_METHODS = new Set([
+  "Browser.getBrowserCommandLine",
+  "Browser.getHistograms",
+  "Browser.getWindowBounds",
+  "Browser.getWindowForTarget",
+  "Browser.setWindowBounds",
+  "Browser.setPermission",
+  "Browser.grantPermissions",
+  "Browser.resetPermissions",
+]);
+
 type GatewaySocketData = {
   upstreamUrl: string;
   pageTargetId: string | null;
@@ -184,7 +198,10 @@ export async function startCdpViewGateway(controller: CdpViewGatewayController):
   function targetDescriptor(tab: BrowserTabInfo): Record<string, unknown> {
     return {
       description: "",
-      devtoolsFrontendUrl: "",
+      // Chromium's discovery UI does not synthesize this URL from the page
+      // WebSocket endpoint. Keep it gateway-scoped so DevTools can attach
+      // without ever pointing at the upstream browser or another view.
+      devtoolsFrontendUrl: `/devtools/inspector.html?ws=127.0.0.1:${port}/devtools/page/${encodeURIComponent(tab.targetId)}`,
       id: tab.targetId,
       title: tab.title,
       type: "page",
@@ -206,6 +223,9 @@ export async function startCdpViewGateway(controller: CdpViewGatewayController):
     const params = message.params ?? {};
 
     try {
+      if (UNSCOPED_BROWSER_METHODS.has(message.method)) {
+        throw new Error("browser-wide CDP method is not available through a view-scoped gateway");
+      }
       if (message.method === "Browser.close") {
         sendResult(socket, message.id, {});
         setTimeout(() => socket.close(1000, "automation client disconnected"), 10);

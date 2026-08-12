@@ -28,6 +28,7 @@ import {
   wheelMouse,
 } from "./daemonClient";
 import { nextBrowserZoom, viewportGeometry } from "./browserZoom";
+import { daemonStateDiagnostics } from "./paths";
 import {
   configuredCaptureBackend,
   configuredCaptureScale,
@@ -1053,7 +1054,8 @@ function renderSessionEndedScreen(): void {
   const lines = [
     "Browser session ended.",
     "The herdr-browser daemon is no longer running.",
-    "Close this pane, or reopen the browser to start a new session.",
+    `State: ${daemonStateDiagnostics().path}`,
+    "Close this pane, or run `herdr-browser inspect` to start a new session.",
   ];
   process.stdout.write("\x1b[2J\x1b[H");
   lines.forEach((line, index) => {

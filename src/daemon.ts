@@ -371,6 +371,7 @@ async function main() {
             url: info.url,
             title: info.title,
             captureBackend: configuredCaptureBackend(),
+            display_mode: process.env.HERDR_BROWSER_DISPLAY === "headful" ? "headful" : "headless",
             tabs: cachedTabs(session),
           } satisfies DaemonStatus);
         }
@@ -711,6 +712,7 @@ async function main() {
       screencastEveryNthFrame: configuredScreencastEveryNthFrame(),
       profileDir: chromeProfileDir(),
       chromePid: runtime.chrome.process.pid ?? null,
+      displayMode: process.env.HERDR_BROWSER_DISPLAY === "headful" ? "headful" : "headless",
     };
     await ensurePrivateParentDir(stateFile);
     await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`, {

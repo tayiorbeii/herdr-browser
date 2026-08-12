@@ -10,6 +10,9 @@ import {
   pageTitle,
 } from "./browser";
 import { parseArgs } from "./args";
+import { loadConfig } from "./config";
+import { openBrowserPane } from "./herdr";
+import { daemonStateFile } from "./paths";
 import {
   automation,
   back,
@@ -20,6 +23,7 @@ import {
   forward,
   metrics,
   listViews,
+  selectSoleView,
   openUrl,
   pageText,
   reload,
@@ -32,6 +36,7 @@ import {
   stopLoading,
   switchTab,
   waitForExpression,
+  waitForViewHeartbeat,
   wheelMouse,
 } from "./daemonClient";
 
@@ -66,9 +71,13 @@ async function main() {
     return;
   }
 
+  if (args.command === "inspect") {
+    console.log(JSON.stringify(await inspectView(args.view), null, 2));
+    return;
+  }
+
   if (args.command === "connect") {
-    const viewId = args.view ?? process.env.HERDR_BROWSER_VIEW_ID?.trim();
-    requireArg(viewId, "missing --view VIEW_ID");
+    const viewId = await resolveExistingView(args.view ?? process.env.HERDR_BROWSER_VIEW_ID?.trim());
     console.log(JSON.stringify(await automation(viewId), null, 2));
     return;
   }
@@ -225,6 +234,69 @@ async function main() {
   throw new Error(`unknown command: ${args.command}`);
 }
 
+async function resolveExistingView(requestedViewId?: string): Promise<string> {
+  const response = await listViews();
+  if (requestedViewId) {
+    if (!response.views.some((view) => view.view_id === requestedViewId)) {
+      throw new Error(`requested browser view is missing or closed: ${requestedViewId}`);
+    }
+    return requestedViewId;
+  }
+  if (response.views.length === 0) {
+    throw new Error("no live browser views; run `herdr-browser inspect` to open one");
+  }
+  if (response.views.length > 1) {
+    const summary = response.views.map((view) =>
+      `${view.view_id} (${view.title || "untitled"}, ${view.url || "about:blank"})`,
+    ).join(", ");
+    throw new Error(`multiple live browser views; specify --view: ${summary}`);
+  }
+  return response.views[0]!.view_id;
+}
+
+async function inspectView(requestedViewId?: string) {
+  const statePath = daemonStateFile();
+  let viewId = requestedViewId;
+  let views = (await listViews()).views;
+
+  if (viewId) {
+    if (!views.some((view) => view.view_id === viewId)) {
+      throw new Error(`requested browser view is missing or closed: ${viewId} (state: ${statePath})`);
+    }
+  } else if (views.length > 1) {
+    const summary = views.map((view) =>
+      `${view.view_id} (${view.title || "untitled"}, ${view.url || "about:blank"})`,
+    ).join(", ");
+    throw new Error(`multiple live browser views; specify --view: ${summary}`);
+  } else if (views.length === 1) {
+    viewId = views[0]!.view_id;
+  } else {
+    // Create the daemon/view first, then open exactly one plugin-owned pane
+    // against the same state path. The viewer heartbeat is the readiness gate.
+    const created = await ensureView();
+    viewId = created;
+    views = (await listViews()).views;
+  }
+
+  const selectedViewId = requestedViewId ? null : await selectSoleView();
+  if (selectedViewId) {
+    viewId = selectedViewId;
+  }
+  const view = views.find((candidate) => candidate.view_id === viewId);
+  if (!view?.pane_id) {
+    const pane = openBrowserPane({ ...(await loadConfig()), focusOnOpen: true }, viewId, statePath);
+    if (!pane.attempted) {
+      throw new Error(`cannot open the Herdr browser viewer: ${pane.reason ?? "HERDR_BIN_PATH is not set"}`);
+    }
+    if (!pane.ok) {
+      throw new Error(`failed to open the Herdr browser viewer: ${pane.stderr ?? pane.reason ?? "unknown error"}`);
+    }
+    await waitForViewHeartbeat(viewId);
+  }
+
+  return await automation(viewId);
+}
+
 async function withSession(callback: (session: Awaited<ReturnType<typeof createBrowserSession>>) => Promise<void>) {
   const session = await createBrowserSession();
   try {
@@ -261,7 +333,8 @@ Usage:
   herdr-browser console
   herdr-browser metrics
   herdr-browser views
-  herdr-browser connect --view <viewId>
+  herdr-browser inspect [--view <viewId>]
+  herdr-browser connect [--view <viewId>]
   herdr-browser automation
   herdr-browser screenshot [url] --output path
   herdr-browser status
@@ -271,6 +344,7 @@ Usage:
 
 Environment:
   HERDR_BROWSER_CHROME  Chrome/Chromium executable path
+  HERDR_BROWSER_DISPLAY  headless (default) or headful (requires a graphical display)
   HERDR_BROWSER_DAEMON_STATE  daemon state file override
 `);
 }

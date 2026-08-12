@@ -11,7 +11,11 @@ export type PaneOpenResult = {
   stderr?: string;
 };
 
-export function openBrowserPane(config: BrowserPluginConfig, viewId?: string): PaneOpenResult {
+export function openBrowserPane(
+  config: BrowserPluginConfig,
+  viewId?: string,
+  daemonState?: string,
+): PaneOpenResult {
   const herdr = process.env.HERDR_BIN_PATH;
   if (!herdr) {
     return {
@@ -21,7 +25,7 @@ export function openBrowserPane(config: BrowserPluginConfig, viewId?: string): P
     };
   }
 
-  const args = browserPaneArgs(config, viewId);
+  const args = browserPaneArgs(config, viewId, daemonState);
 
   const result = spawnSync(herdr, args, {
     encoding: "utf8",
@@ -37,7 +41,11 @@ export function openBrowserPane(config: BrowserPluginConfig, viewId?: string): P
   };
 }
 
-export function browserPaneArgs(config: BrowserPluginConfig, viewId?: string): string[] {
+export function browserPaneArgs(
+  config: BrowserPluginConfig,
+  viewId?: string,
+  daemonState?: string,
+): string[] {
   const args = [
     "plugin",
     "pane",
@@ -61,6 +69,9 @@ export function browserPaneArgs(config: BrowserPluginConfig, viewId?: string): s
     }
   }
   args.push("--env", `HERDR_BROWSER_TRANSPORT=${configuredGraphicsTransport()}`);
+  if (daemonState) {
+    args.push("--env", `HERDR_BROWSER_DAEMON_STATE=${daemonState}`);
+  }
   if (viewId) {
     args.push("--env", `HERDR_BROWSER_VIEW_ID=${viewId}`);
   }

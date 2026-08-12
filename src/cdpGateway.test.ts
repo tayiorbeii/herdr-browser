@@ -96,9 +96,16 @@ describe("view-scoped CDP gateway", () => {
     cleanups.push(gateway.close);
 
     const response = await fetch(`${gateway.httpUrl}/json/list`);
-    const targets = await response.json() as Array<{ id: string; webSocketDebuggerUrl: string }>;
+    const targets = await response.json() as Array<{
+      id: string;
+      webSocketDebuggerUrl: string;
+      devtoolsFrontendUrl: string;
+    }>;
     expect(targets.map((target) => target.id)).toEqual(["owned-1"]);
     expect(targets[0]?.webSocketDebuggerUrl).toBe(gateway.pageWebSocketUrl("owned-1"));
+    expect(targets[0]?.devtoolsFrontendUrl).toBe(
+      `/devtools/inspector.html?ws=127.0.0.1:${new URL(gateway.httpUrl).port}/devtools/page/owned-1`,
+    );
     expect((await fetch(`${gateway.httpUrl}/json/version/`)).status).toBe(200);
 
     const client = await CdpClient.connect(gateway.browserWebSocketUrl);
@@ -107,6 +114,10 @@ describe("view-scoped CDP gateway", () => {
       targetId: "foreign-1",
       flatten: true,
     })).rejects.toThrow("target is not owned by browser view view-a");
+
+    await expect(client.send("Browser.getBrowserCommandLine")).rejects.toThrow(
+      "browser-wide CDP method is not available through a view-scoped gateway",
+    );
 
     await expect(client.send("Runtime.evaluate", {
       expression: "1",

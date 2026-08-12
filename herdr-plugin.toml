@@ -12,6 +12,12 @@ contexts = ["workspace"]
 command = ["bun", "run", "src/actions/status.ts"]
 
 [[actions]]
+id = "inspect"
+title = "Inspect browser view"
+contexts = ["workspace"]
+command = ["bun", "run", "src/cli.ts", "inspect"]
+
+[[actions]]
 id = "open-localhost"
 title = "Open localhost in browser"
 contexts = ["workspace"]

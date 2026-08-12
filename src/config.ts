@@ -31,6 +31,7 @@ export type BrowserPluginConfig = {
   screencastEveryNthFrame: 1 | 2;
   screencastPollMs: number;
   profileRoot: string | null;
+  displayMode?: "headless" | "headful";
 };
 
 const DEFAULT_CONFIG: BrowserPluginConfig = {
@@ -87,6 +88,7 @@ export function normalizeConfig(raw: unknown): BrowserPluginConfig {
     profileRoot: typeof source.profileRoot === "string" && source.profileRoot.trim().length > 0
       ? source.profileRoot.trim()
       : DEFAULT_CONFIG.profileRoot,
+    ...(source.displayMode === "headful" ? { displayMode: "headful" as const } : {}),
   };
 }
 
@@ -103,6 +105,7 @@ export function applyBrowserConfigEnv(
   } else {
     delete env.HERDR_BROWSER_PROFILE_ROOT;
   }
+  env.HERDR_BROWSER_DISPLAY = config.displayMode ?? "headless";
 }
 
 export function saveBrowserZoom(

@@ -8,16 +8,35 @@ export function projectRoot(): string {
   return dirname(dirname(fileURLToPath(import.meta.url)));
 }
 
+export type DaemonStateDiagnostics = {
+  path: string;
+  stateDir: string;
+  source: "override" | "plugin" | "standalone";
+  session: string | null;
+  profileDir: string;
+};
+
 export function daemonStateFile(env: NodeJS.ProcessEnv = process.env): string {
-  if (env.HERDR_BROWSER_DAEMON_STATE) {
-    return env.HERDR_BROWSER_DAEMON_STATE;
-  }
+  return daemonStateDiagnostics(env).path;
+}
+
+/** Safe, non-secret information useful when a CLI and plugin disagree about state. */
+export function daemonStateDiagnostics(
+  env: NodeJS.ProcessEnv = process.env,
+): DaemonStateDiagnostics {
+  const override = env.HERDR_BROWSER_DAEMON_STATE?.trim();
   const stateDir = browserStateDir(env);
-  const session = env.HERDR_SESSION?.trim();
-  if (session) {
-    return join(stateDir, `daemon-${safeFilenamePart(session)}.json`);
-  }
-  return join(stateDir, "daemon.json");
+  const session = env.HERDR_SESSION?.trim() || null;
+  const path = override || (session
+    ? join(stateDir, `daemon-${safeFilenamePart(session)}.json`)
+    : join(stateDir, "daemon.json"));
+  return {
+    path,
+    stateDir,
+    source: override ? "override" : env.HERDR_PLUGIN_STATE_DIR || env.HERDR_ENV === "1" ? "plugin" : "standalone",
+    session,
+    profileDir: chromeProfileDir(env),
+  };
 }
 
 function herdrPluginStateDir(env: NodeJS.ProcessEnv): string {

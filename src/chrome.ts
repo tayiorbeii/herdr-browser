@@ -32,11 +32,18 @@ const STDERR_RING_BUFFER_MAX_LINES = 20;
 
 export async function launchChrome(): Promise<ChromeInstance> {
   const executable = await findChromeExecutable();
+  const displayMode = process.env.HERDR_BROWSER_DISPLAY === "headful" ? "headful" : "headless";
+  if (displayMode === "headful" && process.platform === "linux" &&
+      !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
+    throw new Error(
+      "headful Chrome requires DISPLAY or WAYLAND_DISPLAY on Linux; set HERDR_BROWSER_DISPLAY=headless or start a graphical session",
+    );
+  }
   const port = await findFreePort();
   const profileDir = chromeProfileDir();
   await ensurePrivateDir(profileDir);
-  const chrome = spawn(executable, [
-    "--headless=new",
+  const chromeArgs = [
+    ...(displayMode === "headless" ? ["--headless=new"] : []),
     "--remote-debugging-address=127.0.0.1",
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profileDir}`,
@@ -66,7 +73,8 @@ export async function launchChrome(): Promise<ChromeInstance> {
     "--metrics-recording-only",
     "--mute-audio",
     "about:blank",
-  ], {
+  ];
+  const chrome = spawn(executable, chromeArgs, {
     stdio: ["ignore", "ignore", "pipe"],
   });
 

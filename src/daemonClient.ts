@@ -1,9 +1,10 @@
-import { open, readFile, rm, unlink } from "node:fs/promises";
+import { access, open, readFile, rm, unlink } from "node:fs/promises";
 import { spawn } from "node:child_process";
 
 import {
   daemonScriptPath,
   daemonStateFile,
+  daemonStateDiagnostics,
   chromeProfileDir,
   ensurePrivateParentDir,
 } from "./paths";
@@ -108,6 +109,39 @@ export async function heartbeatView(viewId: string, paneId?: string): Promise<vo
     DAEMON_REQUEST_TIMEOUT_MS,
     viewId,
   );
+}
+
+export async function waitForViewHeartbeat(
+  viewId: string,
+  timeoutMs = DAEMON_REQUEST_TIMEOUT_MS,
+): Promise<void> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const response = await listViews();
+    const view = response.views.find((candidate) => candidate.view_id === viewId);
+    if (view?.pane_id) {
+      selectView(viewId);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`timed out waiting for viewer heartbeat for view ${viewId}; state: ${daemonStateFile()}`);
+}
+
+export async function selectSoleView(): Promise<string | null> {
+  const state = await requireRunningDaemon();
+  const selection = await request<BrowserViewSelectionResponse>(
+    state,
+    "GET",
+    "/views/select",
+    undefined,
+    DAEMON_REQUEST_TIMEOUT_MS,
+    null,
+  );
+  if (selection.viewId) {
+    selectView(selection.viewId);
+  }
+  return selection.viewId;
 }
 
 export async function listViews(): Promise<BrowserViewListResponse> {
@@ -503,7 +537,14 @@ async function isAlive(state: DaemonState): Promise<boolean> {
 async function requireRunningDaemon(): Promise<DaemonState> {
   const state = await readDaemonState();
   if (!state || !await isAlive(state)) {
-    throw new Error("browser daemon is not running");
+    const diagnostics = daemonStateDiagnostics();
+    const stateIssue = state ? "health check failed" :
+      await hasStateFile(diagnostics.path) ? "state file is invalid" : "state file is missing";
+    throw new Error(
+      `browser daemon is not running (${stateIssue}; state: ${diagnostics.path}; ` +
+      `source: ${diagnostics.source}; session: ${diagnostics.session ?? "default"}; ` +
+      `profile: ${diagnostics.profileDir})`,
+    );
   }
   return state;
 }
@@ -514,7 +555,7 @@ async function requireRunningDaemon(): Promise<DaemonState> {
 // "session ended" state instead of silently respawning the daemon.
 export function isDaemonGoneError(error: unknown): boolean {
   return error instanceof Error && (
-    error.message === "browser daemon is not running" ||
+    error.message.startsWith("browser daemon is not running") ||
     error.message === "browser view is missing or closed"
   );
 }
@@ -548,7 +589,9 @@ async function hasLiveViews(state: DaemonState): Promise<boolean> {
     );
     return response.views.length > 0;
   } catch {
-    return false;
+    // A healthy daemon whose view listing is temporarily unavailable is
+    // still owned by live panes. Replacing it would strand those viewers.
+    return true;
   }
 }
 
@@ -579,7 +622,18 @@ export function daemonConfigMatches(state: DaemonState): boolean {
     (state.screencastEveryNthFrame ?? DEFAULT_SCREENCAST_EVERY_NTH_FRAME) ===
     configuredScreencastEveryNthFrame();
   const profileMatches = state.profileDir === chromeProfileDir();
-  return captureBackendMatches && cadenceMatches && profileMatches;
+  const displayModeMatches = process.env.HERDR_BROWSER_DISPLAY === undefined ||
+    (state.displayMode ?? "headless") === process.env.HERDR_BROWSER_DISPLAY;
+  return captureBackendMatches && cadenceMatches && profileMatches && displayModeMatches;
+}
+
+async function hasStateFile(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function readDaemonState(): Promise<DaemonState | null> {
