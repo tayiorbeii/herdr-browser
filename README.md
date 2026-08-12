@@ -6,6 +6,68 @@
 
 Herdr browser brings the web into your terminal window. You can view websites and interact with page elements without leaving your command line interface. This tool uses the Chromium engine to display pages inside a Herdr pane. Developers use the Chrome DevTools Protocol to control these views. This approach creates a clean workflow for people who spend their days in the terminal.
 
+## ⚡ Quickstart
+
+Use the plugin-owned viewer for the visual browser and the CLI for navigation or
+CDP automation. From the plugin directory, run:
+
+```bash
+herdr-browser inspect
+```
+
+When running from a checkout, the equivalent command is:
+
+```bash
+bun run src/cli.ts inspect
+```
+
+`inspect` selects the only live browser view, or starts one and opens/focuses a
+Herdr-owned `Browser` pane. It prints the view-scoped CDP HTTP endpoint, browser
+and page WebSocket URLs, plus ready-to-use snippets for
+`chrome-devtools-mcp`, Playwright, and Puppeteer. The viewer pane must be
+plugin-owned; a terminal pane merely titled `Browser` is not sufficient.
+
+### Select a specific view
+
+```bash
+herdr-browser views
+herdr-browser inspect --view <view-id>
+herdr-browser connect --view <view-id>
+```
+
+Use `status` for daemon diagnostics:
+
+```bash
+herdr-browser status
+```
+
+### Headful mode
+
+Headless mode is the default. To launch Herdr's managed Chromium with a native
+window, use:
+
+```bash
+HERDR_BROWSER_DISPLAY=headful herdr-browser inspect
+```
+
+Linux requires `DISPLAY` or `WAYLAND_DISPLAY`. Herdr still uses a private
+per-session profile and advertises only the view-scoped gateway.
+
+### Important CDP distinction
+
+`chrome-devtools-mcp` and Playwright MCP are automation clients, not browser
+windows. They attach to the endpoint printed by `inspect`; they do not render a
+visual tab. `chrome://inspect` can attach DevTools after manually adding the
+gateway's current ephemeral endpoint, but it cannot import the remote page as a
+normal native tab in another Chrome process.
+
+If a shell and plugin resolve different daemon state files, pass the same state
+path explicitly:
+
+```bash
+HERDR_BROWSER_DAEMON_STATE=/path/to/daemon.json herdr-browser inspect
+```
+
 ## 💻 System requirements
 
 Your computer must meet these basic needs to run the software:
